@@ -1,0 +1,97 @@
+---
+title: "Practical Machine Learning Project"
+author: "Song Ray Yang"
+date: "Thursday, June 18, 2015"
+output: html_document
+---
+
+
+####Introduction
+
+This project for Practical Machine Learning course will use data from http://groupware.les.inf.puc-rio.br/har on weight lifting to predict whether enthusiasts with personal activity devices performed the exercises correctly. The goal is to use the training data set to build and validate the model to predict the results of the 20 test cases.
+
+To reference the study and dataset please see:
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
+
+#### Get Data, Load Libraries and Preprocess
+
+```{r}
+#Download the training and testing sets and put them in your working directory
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+training <- read.csv("pml-training.csv", na.strings=c("NA", "#DIV/0!",""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA", "#DIV/0!",""))
+
+library(caret)
+```
+
+After performing str(training), there are a lot of columns with NA, so those columns are discarded. This is done for both the training and the testing set.
+
+```{r}
+NAvar <- apply(training, 2, function(x) {sum(is.na(x))})
+training1 <- training[, which(NAvar == 0)]
+testing1 <- testing[, which(NAvar == 0)]
+
+```
+
+The first 7 variables are descriptive of test subject rather than quantitative for the model so I removed them from the training and testing datasets as well.
+
+```{r}
+training2 <- training1[,-c(1:7)]
+testing2 <- testing1[,-c(1:7)]
+
+```
+
+To perform cross validation for a better model later, I split the training set into two, one for training and the other for cross validation.
+
+```{r}
+set.seed(100)
+inTrain <- createDataPartition(y=training2$class, p=0.8, list=F)
+training3 <- training2[inTrain,]
+training4 <- training2[-inTrain,]
+
+```
+
+####Model Building
+
+I choose to use Random Forest method for the model.
+
+```{r}
+modFit <- train(training3$classe ~., method="rf", data=training3, prox = TRUE, allowParallel = TRUE)
+modFit
+```
+
+Now use the model and use confusion matrix to test the result.
+
+```{r}
+predict1 <- predict(modFit, training4)
+confusionMatrix(predict1, training4$classe)
+
+
+predict2 <- predict(modFit, testing2)
+predict2
+
+```
+
+In theory, one should hope for out of sample error to be lower than the in sample error. It is calculated by using the formula 1- Accuracy from the confusion matrix. The out of sample error as seen with predict1 confusion matrix is smaller than the in sample error, the model using the random forest method will be used for the predicting on the testing data set.
+
+For the project, the following code is run to generate the solution for submission.
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predict2)
+```
+
+####Conlusion
+
+In conclusion, given the success of predicting the testing set, the model that has been constructed using the random forest method is sufficiently accurate for predicting whether the weight lifting exercise is properly performed.
+
+
